@@ -1,0 +1,30 @@
+{
+  "name": "bs2-serialport",
+  "version": "0.0.0",
+  "description": "bs2 wrapper for node-serialport",
+  "author": "Jacob Rosenthal",
+  "contributors": [],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jacobrosenthal/bs2-serialport"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">= 0.10"
+  },
+  "main": "index.js",
+  "files": [
+    "index.js"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "serialport": "jacobrosenthal/node-serialport#update",
+    "when": "^3.7.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "bs2 parallax basic stamp serialport"
+  ]
+}
