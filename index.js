@@ -7,7 +7,11 @@ var nodefn = require('when/node');
 function Protocol(options){
   var self = this;
 
-  this._serial = options.serialport || new SerialPort(options.path, options.options);
+  //todo fail on no options.path
+
+  var opts = options.options || { baudrate: 200 };
+
+  this._serial = options.serialport || new SerialPort(options.path, opts, false);
 
   this._queue = null;
 
@@ -17,6 +21,40 @@ function Protocol(options){
     }
   });
 }
+
+Protocol.prototype.enterProgramming = function(cb){
+  var serialport = this._serial;
+
+  function _open(){
+    return when.promise(function(resolve, reject) {
+      serialport.open( function(err){
+        if(err){ return reject(err); }
+        return resolve();
+      });
+    });
+  }
+
+  var promise = _open()
+    .then(this.reset.bind(this));
+  return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype.exitProgramming = function(cb){
+  var serialport = this._serial;
+
+  function _close(){
+    return when.promise(function(resolve, reject) {
+      serialport.close( function(err){
+        if(err){ return reject(err); }
+        return resolve();
+      });
+    });
+  }
+
+  var promise = this.signoff()
+    .then(_close());
+  return nodefn.bindCallback(promise, cb);
+};
 
 Protocol.prototype._onResponse = function(fn){
   this._queue = fn;
