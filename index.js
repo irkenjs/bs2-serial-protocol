@@ -3,10 +3,13 @@
 var SerialPort = require('serialport').SerialPort;
 var when = require('when');
 var nodefn = require('when/node');
+var EventEmitter = require('events').EventEmitter;
+var util = require('util');
 
 function Protocol(options){
   var self = this;
 
+  EventEmitter.call(this);
   //todo fail on no options.path
 
   var opts = options.options || { baudrate: 200 };
@@ -21,6 +24,11 @@ function Protocol(options){
     }
   });
 }
+util.inhertis(Protocol, EventEmitter);
+
+Protocol.prototype.log = function(data){
+  this.emit('log', data);
+};
 
 Protocol.prototype.enterProgramming = function(cb){
   var serialport = this._serial;
