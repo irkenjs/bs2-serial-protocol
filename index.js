@@ -22,6 +22,46 @@ function Protocol(options){
   });
 }
 
+//if opened before a bootload is attempted, opened at 200 intead of 9600
+Protocol.prototype.open = function(options, cb){
+  var serialport = this._serial;
+
+  function _open(){
+    return when.promise(function(resolve, reject) {
+      serialport.open( function(err){
+        if(err){ return reject(err); }
+        return resolve();
+      });
+    });
+  }
+
+  function onChunk(data) {
+    self.emit('data', data);
+  }
+
+  self._onResponse(onChunk);
+
+  var promise = _open();
+  return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype.close = function(cb){
+  var serialport = this._serial;
+
+  function _close(){
+    return when.promise(function(resolve, reject) {
+      serialport.close( function(err){
+        if(err){ return reject(err); }
+        return resolve();
+      });
+    });
+  }
+
+  var promise = this.signoff()
+    .then(_close());
+  return nodefn.bindCallback(promise, cb);
+};
+
 Protocol.prototype.enterProgramming = function(cb){
   var serialport = this._serial;
 
