@@ -1,41 +1,119 @@
 'use strict';
 
+var util = require('util');
+
+var cloneDeep = require('lodash/lang/cloneDeep');
 var SerialPort = require('serialport').SerialPort;
 var when = require('when');
 var nodefn = require('when/node');
 
-function Protocol(options){
-  var self = this;
+var openRegexp = new RegExp('Serialport not open.');
 
-  var transport = options.transport;
+function closeCustomTransport(customTransport){
+  return when.promise(function(resolve, reject){
+    customTransport.close(function(err){
+      if(err && !openRegexp.test(err.message)){
+        // reject if error is not "Serialport not open."
+        return reject(err);
+      }
+
+      resolve();
+    });
+  });
+}
+
+function Protocol(options){
+  var customTransport = options.transport;
 
   //todo fail on no options.path
   var path = options.path;
-  var opts = options.options || { baudrate: 200 };
+  var opts = options.options || { baudrate: 9600 };
   var TransportCtor = SerialPort;
-  if(transport){
-    path = transport.path;
-    opts = transport.options;
-    TransportCtor = transport.constructor;
+  if(customTransport){
+    path = customTransport.path;
+    opts = customTransport.options;
+    TransportCtor = customTransport.constructor;
   }
 
   // if we receive a SerialPort in options, we don't want to mutate it
   // so we use this pattern to copy and promisify it
   function Transport(){
     TransportCtor.apply(this, arguments);
-  }
-  Transport.prototype = nodefn.liftAll(TransportCtor.prototype);
 
-  this._transport = new Transport(path, opts, false);
+    if(customTransport){
+      this.options.dataCallback = function(data){
+        customTransport.options.parser(this, data);
+      }.bind(this);
+    }
+  }
+  util.inherits(Transport, TransportCtor);
+  // undefined causes liftAll to use the default combiner
+  // passing Transport.prototype to the last argument uses that as the accumulator
+  nodefn.liftAll(TransportCtor.prototype, undefined, Transport.prototype);
+
+  this._isOpen = false;
+  var transport = this._transport = new Transport(path, opts, false);
+  // saving the original options from the transport to allow
+  this._options = cloneDeep({
+    path: transport.path,
+    options: transport.options
+  });
+
+  // if we are given a transport, attempt to close it
+  if(customTransport){
+    // make this a promise for simpler code paths
+    this._originalTransportClosed = closeCustomTransport(customTransport);
+  }
 
   this._queue = null;
-
-  this._transport.on('data', function(chunk){
-    if(typeof self._queue === 'function'){
-      self._queue(chunk);
-    }
-  });
 }
+
+Protocol.prototype._open = function(cb){
+  var self = this;
+  var transport = this._transport;
+
+  var promise;
+  if(this._isOpen){
+    promise = when.reject(new Error('Transport already open.'));
+  } else {
+    // the close method removes all event listeners,
+    // so we need to rebind on our open
+    transport.on('data', function(chunk){
+      if(typeof self._queue === 'function'){
+        self._queue(chunk);
+      }
+    });
+
+    promise = transport.open()
+      .tap(function(){
+        self._isOpen = true;
+      });
+  }
+
+  return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype._close = function(cb){
+  var self = this;
+  var transport = this._transport;
+
+  function onClose(){
+    self._isOpen = false;
+  }
+
+  var promise = transport.close()
+    .tap(onClose)
+    .catch(function(err){
+      if(err && !openRegexp.test(err.message)){
+        // rethrow error if it is not "Serialport not open."
+        throw err;
+      }
+
+      onClose();
+    });
+
+  return nodefn.bindCallback(promise, cb);
+};
 
 Protocol.prototype._setDtr = function(cb){
   var transport = this._transport;
@@ -58,24 +136,30 @@ Protocol.prototype._setBrk = function(cb){
 
   var brkBit = new Buffer([0x00]);
 
-  var promise = transport.write(brkBit);
+  var promise = transport.update({ baudRate: 200 })
+    .then(function(){
+      return transport.write(brkBit);
+    });
 
   return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype._clrBrk = function(cb){
   var transport = this._transport;
+  var options = this._options.options;
 
-  var promise = transport.update({ baudRate: 9600 });
+  var promise = transport.update({ baudRate: options.baudrate });
 
   return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype.enterProgramming = function(cb){
   var self = this;
-  var transport = this._transport;
 
-  var promise = transport.open()
+  var promise = this._originalTransportClosed
+    .then(function(){
+      return self._open();
+    })
     .then(function(){
       return self._setBrk();
     })
@@ -91,11 +175,11 @@ Protocol.prototype.enterProgramming = function(cb){
 };
 
 Protocol.prototype.exitProgramming = function(cb){
-  var transport = this._transport;
+  var self = this;
 
   var promise = this.signoff()
     .then(function(){
-      return transport.close();
+      return self._close();
     });
 
   return nodefn.bindCallback(promise, cb);
@@ -107,7 +191,7 @@ Protocol.prototype._onResponse = function(fn){
 
 Protocol.prototype.send = function send(data, cb){
   var self = this;
-  var serial = this._transport;
+  var transport = this._transport;
 
   var responseLength = data.length + 1;
 
@@ -127,11 +211,8 @@ Protocol.prototype.send = function send(data, cb){
 
     self._onResponse(onChunk);
 
-    serial.write(data, function (writeError) {
-      if (writeError) {
-        return reject(writeError);
-      }
-    });
+    transport.write(data)
+      .catch(reject);
   });
 
   return nodefn.bindCallback(promise, cb);
