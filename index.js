@@ -22,6 +22,17 @@ function closeCustomTransport(customTransport){
   });
 }
 
+var toLift = ['open', 'close', 'set', 'update', 'write'];
+
+// only lift the functions we use
+function lifter(result, lifted, name){
+  if(toLift.indexOf(name) !== -1){
+    result[name] = lifted;
+  }
+
+  return result;
+}
+
 function Protocol(options){
   var customTransport = options.transport;
 
@@ -47,9 +58,8 @@ function Protocol(options){
     }
   }
   util.inherits(Transport, TransportCtor);
-  // undefined causes liftAll to use the default combiner
   // passing Transport.prototype to the last argument uses that as the accumulator
-  nodefn.liftAll(TransportCtor.prototype, undefined, Transport.prototype);
+  nodefn.liftAll(TransportCtor.prototype, lifter, Transport.prototype);
 
   this._isOpen = false;
   var transport = this._transport = new Transport(path, opts, false);
