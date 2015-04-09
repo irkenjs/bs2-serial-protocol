@@ -63,6 +63,8 @@ function Protocol(options){
   if(customTransport){
     // make this a promise for simpler code paths
     this._originalTransportClosed = closeCustomTransport(customTransport);
+  } else {
+    this._originalTransportClosed = when.resolve();
   }
 
   this._queue = null;
