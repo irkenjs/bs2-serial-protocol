@@ -1,7 +1,7 @@
 {
-  "name": "bs2-serialport",
+  "name": "bs2-serial-protocol",
   "version": "0.0.0",
-  "description": "bs2 wrapper for node-serialport",
+  "description": "bs2 protocol abstraction for node-serialport",
   "author": "Jacob Rosenthal",
   "contributors": [],
   "repository": {
