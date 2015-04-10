@@ -77,7 +77,7 @@ function Protocol(options){
     this._originalTransportClosed = when.resolve();
   }
 
-  this._queue = null;
+  this._readAfterProgram = options.readAfterProgram || false;
 }
 
 Protocol.prototype._open = function(cb){
@@ -88,14 +88,6 @@ Protocol.prototype._open = function(cb){
   if(this._isOpen){
     promise = when.reject(new Error('Transport already open.'));
   } else {
-    // the close method removes all event listeners,
-    // so we need to rebind on our open
-    transport.on('data', function(chunk){
-      if(typeof self._queue === 'function'){
-        self._queue(chunk);
-      }
-    });
-
     promise = transport.open()
       .tap(function(){
         self._isOpen = true;
@@ -170,6 +162,11 @@ Protocol.prototype.enterProgramming = function(cb){
 
   var promise = this._originalTransportClosed
     .then(function(){
+      if(self._isOpen){
+        return self._close();
+      }
+    })
+    .then(function(){
       return self._open();
     })
     .then(function(){
@@ -191,40 +188,46 @@ Protocol.prototype.exitProgramming = function(cb){
 
   var promise = this.signoff()
     .then(function(){
-      return self._close();
+      if(!self._readAfterProgram){
+        return self._close();
+      }
     });
 
   return nodefn.bindCallback(promise, cb);
 };
 
-Protocol.prototype._onResponse = function(fn){
-  this._queue = fn;
-};
-
 Protocol.prototype.send = function send(data, cb){
-  var self = this;
   var transport = this._transport;
 
   var responseLength = data.length + 1;
 
-  var promise = when.promise(function(resolve, reject) {
+  var defer = when.defer();
 
-    var buffer = new Buffer(0);
-    function onChunk(chunk) {
-      buffer = Buffer.concat([buffer, chunk]);
-      if (buffer.length > responseLength) {
-        // or ignore after
-        return reject(new Error('buffer overflow ' + buffer.length + ' > ' + responseLength));
-      }
-      if (buffer.length === responseLength) {
-        resolve(buffer[data.length]);
-      }
+  var buffer = new Buffer(0);
+  function onChunk(chunk){
+    buffer = Buffer.concat([buffer, chunk]);
+    if(buffer.length < responseLength){
+      // keep buffering
+      return;
     }
 
-    self._onResponse(onChunk);
+    if (buffer.length > responseLength) {
+      // or ignore after
+      defer.reject(new Error('buffer overflow ' + buffer.length + ' > ' + responseLength));
+      return;
+    }
+    if (buffer.length === responseLength) {
+      defer.resolve(buffer[data.length]);
+    }
+  }
 
-    transport.write(data)
-      .catch(reject);
+  transport.on('data', onChunk);
+
+  transport.write(data)
+    .catch(defer.reject);
+
+  var promise = defer.promise.finally(function(){
+    transport.removeListener('data', onChunk);
   });
 
   return nodefn.bindCallback(promise, cb);
