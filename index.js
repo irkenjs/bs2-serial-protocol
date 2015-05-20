@@ -270,7 +270,7 @@ Protocol.prototype.close = function close(cb){
   if(this._isOpen){
     return this._close(cb);
   }else{
-    return nodefn.bindCallback(when(), cb);
+    return nodefn.bindCallback(when.resolve(), cb);
   }
 };
 
