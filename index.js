@@ -76,8 +76,6 @@ function Protocol(options){
   } else {
     this._originalTransportClosed = when.resolve();
   }
-
-  this._readAfterProgram = options.readAfterProgram || false;
 }
 
 Protocol.prototype._open = function(cb){
@@ -157,8 +155,14 @@ Protocol.prototype._clrBrk = function(cb){
   return nodefn.bindCallback(promise, cb);
 };
 
-Protocol.prototype.enterProgramming = function(cb){
+Protocol.prototype.enterProgramming = function(options, cb){
   var self = this;
+  if(typeof options === 'function'){
+    cb = options;
+    options = {};
+  }else{
+    options = options || {};
+  }
 
   var promise = this._originalTransportClosed
     .then(function(){
@@ -183,12 +187,19 @@ Protocol.prototype.enterProgramming = function(cb){
   return nodefn.bindCallback(promise, cb);
 };
 
-Protocol.prototype.exitProgramming = function(cb){
+Protocol.prototype.exitProgramming = function(options, cb){
   var self = this;
+
+  if(typeof options === 'function'){
+    cb = options;
+    options = {};
+  }else{
+    options = options || {};
+  }
 
   var promise = this.signoff()
     .then(function(){
-      if(!self._readAfterProgram){
+      if(!options.keepOpen){
         return self._close();
       }
     });
@@ -253,6 +264,14 @@ Protocol.prototype.signoff = function signoff(cb){
   var promise = transport.write(signoffBit);
 
   return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype.close = function close(cb){
+  if(this._isOpen){
+    return this._close(cb);
+  }else{
+    return nodefn.bindCallback(when.resolve(), cb);
+  }
 };
 
 module.exports = Protocol;
