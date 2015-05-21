@@ -25,7 +25,6 @@
     "serialport": "jacobrosenthal/node-serialport#update",
     "when": "^3.7.2"
   },
-  "devDependencies": {},
   "keywords": [
     "bs2 parallax basic stamp serialport"
   ]
