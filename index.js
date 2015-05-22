@@ -109,8 +109,6 @@ Protocol.prototype._close = function(cb){
     self._isOpen = false;
   }
 
-  transport.removeAllListeners('data');
-
   var promise = transport.close()
     .tap(onClose)
     .catch(function(err){
@@ -209,7 +207,8 @@ Protocol.prototype.exitProgramming = function(options, cb){
     .then(function(){
       if(!options.keepOpen){
         return self._close();
-      }else if(options.listen){
+      }
+      if(options.listen){
         return self.listenPort();
       }
     });
