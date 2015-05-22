@@ -1,11 +1,13 @@
 'use strict';
 
 var util = require('util');
-
-var cloneDeep = require('lodash/lang/cloneDeep');
-var SerialPort = require('serialport').SerialPort;
 var when = require('when');
 var nodefn = require('when/node');
+var cloneDeep = require('lodash/lang/cloneDeep');
+var SerialPort = require('serialport').SerialPort;
+var EventEmitter = require('events').EventEmitter;
+
+var parseStreamChunk = require('./lib/parse-stream-chunk');
 
 var openRegexp = new RegExp('Serialport not open.');
 
@@ -35,6 +37,8 @@ function lifter(result, lifted, name){
 
 function Protocol(options){
   var customTransport = options.transport;
+
+  EventEmitter.call(this);
 
   //todo fail on no options.path
   var path = options.path;
@@ -77,6 +81,8 @@ function Protocol(options){
     this._originalTransportClosed = when.resolve();
   }
 }
+
+util.inherits(Protocol, EventEmitter);
 
 Protocol.prototype._open = function(cb){
   var self = this;
@@ -202,9 +208,22 @@ Protocol.prototype.exitProgramming = function(options, cb){
       if(!options.keepOpen){
         return self._close();
       }
+      if(options.listen){
+        return self.listenPort();
+      }
     });
 
   return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype._emitData = function _emitData(chunk){
+  this.emit('terminal', parseStreamChunk(chunk));
+};
+
+Protocol.prototype.listenPort = function listenPort(cb){
+  this._transport.on('data', this._emitData.bind(this));
+
+  return nodefn.bindCallback(when.resolve(), cb);
 };
 
 Protocol.prototype.send = function send(data, cb){
