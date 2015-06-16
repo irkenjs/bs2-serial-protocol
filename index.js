@@ -7,7 +7,7 @@ var cloneDeep = require('lodash/lang/cloneDeep');
 var SerialPort = require('serialport').SerialPort;
 var EventEmitter = require('events').EventEmitter;
 
-var parseStreamChunk = require('./lib/parse-stream-chunk');
+var TerminalStreamParser = require('./lib/terminal-stream-parser');
 
 var openRegexp = new RegExp('Serialport not open.');
 
@@ -49,6 +49,8 @@ function Protocol(options){
     opts = customTransport.options;
     TransportCtor = customTransport.constructor;
   }
+
+  this.terminal = new TerminalStreamParser();
 
   // if we receive a SerialPort in options, we don't want to mutate it
   // so we use this pattern to copy and promisify it
@@ -217,7 +219,7 @@ Protocol.prototype.exitProgramming = function(options, cb){
 };
 
 Protocol.prototype._emitData = function _emitData(chunk){
-  this.emit('terminal', parseStreamChunk(chunk));
+  this.emit('terminal', this.terminal.parseStreamChunk(chunk));
 };
 
 Protocol.prototype.listenPort = function listenPort(cb){
