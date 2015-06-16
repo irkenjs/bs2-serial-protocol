@@ -15,7 +15,7 @@
   "main": "index.js",
   "files": [
     "index.js",
-    "lib/parse-stream-chunk.js"
+    "lib/terminal-stream-parser.js"
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
