@@ -255,7 +255,7 @@ Protocol.prototype.send = function send(data, cb){
 
   transport.on('data', onChunk);
 
-  transport.write(data).then()
+  transport.write(data)
     .catch(defer.reject);
 
   var promise = defer.promise.finally(function(){
