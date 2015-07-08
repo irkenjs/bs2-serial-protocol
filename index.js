@@ -265,6 +265,14 @@ Protocol.prototype.send = function send(data, cb){
   return nodefn.bindCallback(promise, cb);
 };
 
+Protocol.prototype.write = function(data, cb){
+  var transport = this._transport;
+
+  var promise = transport.write(data);
+
+  return nodefn.bindCallback(promise, cb);
+};
+
 Protocol.prototype.reset = function reset(cb){
   var self = this;
 
@@ -285,6 +293,10 @@ Protocol.prototype.signoff = function signoff(cb){
   var promise = transport.write(signoffBit);
 
   return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype.open = function open(cb){
+  return this._open(cb);
 };
 
 Protocol.prototype.close = function close(cb){
