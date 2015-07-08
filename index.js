@@ -255,12 +255,20 @@ Protocol.prototype.send = function send(data, cb){
 
   transport.on('data', onChunk);
 
-  transport.write(data)
+  transport.write(data).then()
     .catch(defer.reject);
 
   var promise = defer.promise.finally(function(){
     transport.removeListener('data', onChunk);
   });
+
+  return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype.write = function(data, cb){
+  var transport = this._transport;
+
+  var promise = transport.write(data);
 
   return nodefn.bindCallback(promise, cb);
 };
@@ -285,6 +293,10 @@ Protocol.prototype.signoff = function signoff(cb){
   var promise = transport.write(signoffBit);
 
   return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype.open = function open(cb){
+  return this._open(cb);
 };
 
 Protocol.prototype.close = function close(cb){
