@@ -75,6 +75,9 @@ function Protocol(options){
     options: transport.options
   });
 
+  transport.on('open', this.emit.bind(this, 'open'));
+  transport.on('close', this.emit.bind(this, 'close'));
+
   // if we are given a transport, attempt to close it
   if(customTransport){
     // make this a promise for simpler code paths
