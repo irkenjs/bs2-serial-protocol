@@ -3,6 +3,7 @@
 var util = require('util');
 var when = require('when');
 var nodefn = require('when/node');
+var reemit = require('re-emitter');
 var cloneDeep = require('lodash/lang/cloneDeep');
 var SerialPort = require('serialport').SerialPort;
 var EventEmitter = require('events').EventEmitter;
@@ -75,8 +76,7 @@ function Protocol(options){
     options: transport.options
   });
 
-  transport.on('open', this.emit.bind(this, 'open'));
-  transport.on('close', this.emit.bind(this, 'close'));
+  reemit(transport, this, ['open', 'close']);
 
   // if we are given a transport, attempt to close it
   if(customTransport){

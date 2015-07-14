@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "lodash": "^3.6.0",
+    "re-emitter": "^1.1.1",
     "serialport": "jacobrosenthal/node-serialport#update",
     "when": "^3.7.2"
   },
