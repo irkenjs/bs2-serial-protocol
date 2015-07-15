@@ -273,10 +273,10 @@ Protocol.prototype.send = function send(data, cb){
 Protocol.prototype.write = function(data, cb){
   var transport = this._transport;
 
-  var promise = transport.write(data);
-
   var transmitEvents = this._transmit.parseStreamChunk(data);
   this.emit('transmit', transmitEvents);
+
+  var promise = transport.write(data);
 
   return nodefn.bindCallback(promise, cb);
 };
