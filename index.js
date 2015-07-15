@@ -9,6 +9,7 @@ var SerialPort = require('serialport').SerialPort;
 var EventEmitter = require('events').EventEmitter;
 
 var TerminalStreamParser = require('./lib/terminal-stream-parser');
+var TransmitStreamParser = require('./lib/transmit-stream-parser');
 
 var openRegexp = new RegExp('Serialport not open.');
 
@@ -51,7 +52,8 @@ function Protocol(options){
     TransportCtor = customTransport.constructor;
   }
 
-  this.terminal = new TerminalStreamParser();
+  this._terminal = new TerminalStreamParser();
+  this._transmit = new TransmitStreamParser();
 
   // if we receive a SerialPort in options, we don't want to mutate it
   // so we use this pattern to copy and promisify it
@@ -222,7 +224,7 @@ Protocol.prototype.exitProgramming = function(options, cb){
 };
 
 Protocol.prototype._emitData = function _emitData(chunk){
-  this.emit('terminal', this.terminal.parseStreamChunk(chunk));
+  this.emit('terminal', this._terminal.parseStreamChunk(chunk));
 };
 
 Protocol.prototype.listenPort = function listenPort(cb){
@@ -270,6 +272,9 @@ Protocol.prototype.send = function send(data, cb){
 
 Protocol.prototype.write = function(data, cb){
   var transport = this._transport;
+
+  var transmitEvents = this._transmit.parseStreamChunk(data);
+  this.emit('transmit', transmitEvents);
 
   var promise = transport.write(data);
 
