@@ -1,11 +1,13 @@
 'use strict';
 
+var _ = require('lodash');
 var util = require('util');
 var when = require('when');
 var nodefn = require('when/node');
 var reemit = require('re-emitter');
 var cloneDeep = require('lodash/lang/cloneDeep');
-var SerialPort = require('serialport').SerialPort;
+var Serial = require('serialport');
+var SerialPort = Serial.SerialPort;
 var EventEmitter = require('events').EventEmitter;
 
 var TerminalStreamParser = require('./lib/terminal-stream-parser');
@@ -313,6 +315,14 @@ Protocol.prototype.close = function close(cb){
   }else{
     return nodefn.bindCallback(when.resolve(), cb);
   }
+};
+
+Protocol.listPorts = function(cb){
+  var results = nodefn.call(Serial.list)
+    .then(function(ports){
+      return _.pluck(ports, 'comName');
+    });
+  return nodefn.bindCallback(results, cb);
 };
 
 module.exports = Protocol;
