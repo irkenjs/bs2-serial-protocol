@@ -15,6 +15,8 @@ var TransmitStreamParser = require('./lib/transmit-stream-parser');
 
 var openRegexp = new RegExp('Serialport not open.');
 
+var DEFAULT_BAUDRATE = 9600;
+
 function closeCustomTransport(customTransport){
   return when.promise(function(resolve, reject){
     customTransport.close(function(err){
@@ -46,7 +48,7 @@ function Protocol(options){
 
   //todo fail on no options.path
   var path = options.path;
-  var opts = options.options || { baudrate: 9600 };
+  var opts = options.options || { baudrate: DEFAULT_BAUDRATE };
   var TransportCtor = SerialPort;
   if(customTransport){
     path = customTransport.path;
@@ -268,6 +270,17 @@ Protocol.prototype.send = function send(data, cb){
   var promise = defer.promise.finally(function(){
     transport.removeListener('data', onChunk);
   });
+
+  return nodefn.bindCallback(promise, cb);
+};
+
+Protocol.prototype.setBaudrate = function(baudrate, cb){
+  var transport = this._transport;
+  var options = this._options.options;
+
+  options.baudrate = baudrate;
+
+  var promise = transport.update({ baudRate: options.baudrate });
 
   return nodefn.bindCallback(promise, cb);
 };
