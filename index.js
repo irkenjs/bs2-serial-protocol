@@ -323,6 +323,11 @@ Protocol.prototype.close = function close(cb){
   }
 };
 
+Protocol.prototype.setEchoOff = function setEcho(echo){
+  this._options.echoOff = echo;
+  this._terminal.clearIgnore();
+};
+
 Protocol.listPorts = function(cb){
   var results = nodefn.call(Serial.list)
     .then(function(ports){
