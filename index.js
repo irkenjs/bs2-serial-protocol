@@ -280,7 +280,7 @@ Protocol.prototype.write = function(data, cb){
   var transmitEvents = this._transmit.parseStreamChunk(data);
   this.emit('transmit', transmitEvents);
 
-  if(this._options.echo){
+  if(!this._options.echo){
     this._terminal.ignore(data);
   }
 
