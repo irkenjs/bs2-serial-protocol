@@ -77,7 +77,8 @@ function Protocol(options){
   // saving the original options from the transport to allow
   this._options = cloneDeep({
     path: transport.path,
-    options: transport.options
+    options: transport.options,
+    echo: options.echo || false
   });
 
   reemit(transport, this, ['open', 'close']);
@@ -214,6 +215,7 @@ Protocol.prototype.exitProgramming = function(options, cb){
 
   var promise = this.signoff()
     .then(function(){
+      self._terminal.clearIgnore();
       if(!options.keepOpen){
         return self._close();
       }
@@ -278,6 +280,10 @@ Protocol.prototype.write = function(data, cb){
   var transmitEvents = this._transmit.parseStreamChunk(data);
   this.emit('transmit', transmitEvents);
 
+  if(!this._options.echo){
+    this._terminal.ignore(data);
+  }
+
   var promise = transport.write(data);
 
   return nodefn.bindCallback(promise, cb);
@@ -315,6 +321,11 @@ Protocol.prototype.close = function close(cb){
   }else{
     return nodefn.bindCallback(when.resolve(), cb);
   }
+};
+
+Protocol.prototype.setEcho = function setEcho(echo){
+  this._options.echo = echo;
+  this._terminal.clearIgnore();
 };
 
 Protocol.listPorts = function(cb){
