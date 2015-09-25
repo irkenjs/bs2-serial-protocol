@@ -78,7 +78,7 @@ function Protocol(options){
   this._options = cloneDeep({
     path: transport.path,
     options: transport.options,
-    echoOff: options.echoOff || true
+    echo: options.echo || false
   });
 
   reemit(transport, this, ['open', 'close']);
@@ -280,7 +280,7 @@ Protocol.prototype.write = function(data, cb){
   var transmitEvents = this._transmit.parseStreamChunk(data);
   this.emit('transmit', transmitEvents);
 
-  if(this._options.echoOff){
+  if(this._options.echo){
     this._terminal.ignore(data);
   }
 
@@ -323,8 +323,8 @@ Protocol.prototype.close = function close(cb){
   }
 };
 
-Protocol.prototype.setEchoOff = function setEcho(echo){
-  this._options.echoOff = echo;
+Protocol.prototype.setEcho = function setEcho(echo){
+  this._options.echo = echo;
   this._terminal.clearIgnore();
 };
 
