@@ -90,7 +90,6 @@ Transport.prototype._onReceive = function onReceive(info){
 
 Transport.prototype._onError = function onError(err){
   var self = this;
-  console.log('onReceiveError', err, chrome.runtime.lastError, this._connectionId);
 
   switch(err.error){
     case 'disconnected':

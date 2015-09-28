@@ -36,17 +36,23 @@ Protocol.prototype.isOpen = function isOpen(){
 };
 
 Protocol.prototype.open = function(cb){
+  var promise;
   if(this.isOpen()){
-    return nodefn.bindCallback(when.resolve(), cb);
+    promise = when.resolve();
+  }else{
+    promise = this._transport.open();
   }
-  return nodefn.bindCallback(this._transport.open(), cb);
+  return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype.close = function(cb){
-  if(!this.isOpen()){
-    return nodefn.bindCallback(when.resolve(), cb);
+  var promise;
+  if(this.isOpen()){
+    promise = when.resolve();
+  }else{
+    promise = this._transport.close();
   }
-  return nodefn.bindCallback(this._transport.close(), cb);
+  return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype.enterProgramming = function(options, cb){
@@ -78,8 +84,6 @@ Protocol.prototype.enterProgramming = function(options, cb){
       transport.autoRecover = true;
       if(transport.isPaused()){
         return transport.unpause();
-      }else{
-        return when.resolve(true);
       }
     })
     .then(function(){
@@ -131,10 +135,6 @@ Protocol.prototype.listenPort = function listenPort(cb){
   return nodefn.bindCallback(when.resolve(), cb);
 };
 
-Protocol.prototype._write = function write(data){
-  return this._transport.send(data);
-};
-
 Protocol.prototype.send = function send(data, cb){
   var self = this;
 
@@ -162,7 +162,7 @@ Protocol.prototype.send = function send(data, cb){
 
   this.on('data', onChunk);
 
-  this._write(data)
+  this._transport.send(data)
     .catch(defer.reject);
 
   var promise = defer.promise.finally(function(){
@@ -179,7 +179,7 @@ Protocol.prototype.write = function(data, cb){
   if(!this._options.echo){
     this._terminal.ignore(data);
   }
-  var promise = this._write(data);
+  var promise = this._transport.send(data);
 
   return nodefn.bindCallback(promise, cb);
 };
@@ -199,7 +199,7 @@ Protocol.prototype.reset = function reset(cb){
 Protocol.prototype.signoff = function signoff(cb){
   var signoffBit = new Buffer([0]);
 
-  var promise = this._write(signoffBit);
+  var promise = this._transport.send(signoffBit);
 
   return nodefn.bindCallback(promise, cb);
 };
@@ -210,6 +210,7 @@ Protocol.prototype.setEcho = function setEcho(echo){
 };
 
 Protocol.listPorts = function(cb){
+  //TODO Refactor listPorts call in bs2-serial to break serial-protocol dependency chain
   return nodefn.bindCallback(Transport.listPorts(), cb);
 };
 
