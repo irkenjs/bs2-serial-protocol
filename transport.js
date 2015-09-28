@@ -69,7 +69,6 @@ function Transport(options) {
   this._paused = false;
   this.autoRecover = true;
 
-  this._closing = false;
   this._resuming = false;
 
   if(!options.path){
@@ -138,7 +137,6 @@ Transport.prototype.open = function(){
 
   return serial.connect(path, opts)
     .then(function(connInfo){
-      self._closing = false;
       self._connectionId = connInfo.connectionId;
       chrome.serial.onReceiveError.addListener(self.onError);
       chrome.serial.onReceive.addListener(self.onReceive);
@@ -149,16 +147,13 @@ Transport.prototype.open = function(){
 Transport.prototype.close = function(){
   var self = this;
 
-  self._closing = serial.disconnect(self._connectionId)
+  return serial.disconnect(self._connectionId)
     .ensure(function(){
-      self._closing = false;
       self._connectionId = -1;
       chrome.serial.onReceiveError.removeListener(self.onError);
       chrome.serial.onReceive.removeListener(self.onReceive);
       self.emit('close');
     });
-
-  return self._closing;
 };
 
 Transport.prototype.set = function(options){
