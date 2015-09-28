@@ -47,7 +47,7 @@ Protocol.prototype.open = function(cb){
 
 Protocol.prototype.close = function(cb){
   var promise;
-  if(this.isOpen()){
+  if(!this.isOpen()){
     promise = when.resolve();
   }else{
     promise = this._transport.close();
