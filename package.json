@@ -6,7 +6,7 @@
   "contributors": [],
   "repository": {
     "type": "git",
-    "url": "https://github.com/jacobrosenthal/bs2-serialport"
+    "url": "https://github.com/irkenjs/bs2-serial-protocol"
   },
   "license": "MIT",
   "engines": {
@@ -20,8 +20,7 @@
     "lib/transmit-stream-parser.js"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "npm rebuild --build-from-source"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "lodash": "^3.6.0",
