@@ -37,14 +37,14 @@ Protocol.prototype.isOpen = function isOpen(){
 
 Protocol.prototype.open = function(cb){
   if(this.isOpen()){
-    return when.resolve(true);
+    return nodefn.bindCallback(when.resolve(), cb);
   }
   return nodefn.bindCallback(this._transport.open(), cb);
 };
 
 Protocol.prototype.close = function(cb){
   if(!this.isOpen()){
-    return when.resolve(true);
+    return nodefn.bindCallback(when.resolve(), cb);
   }
   return nodefn.bindCallback(this._transport.close(), cb);
 };
