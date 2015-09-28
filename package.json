@@ -6,7 +6,7 @@
   "contributors": [],
   "repository": {
     "type": "git",
-    "url": "https://github.com/jacobrosenthal/bs2-serialport"
+    "url": "https://github.com/irkenjs/bs2-serial-protocol"
   },
   "license": "MIT",
   "engines": {
@@ -15,17 +15,16 @@
   "main": "index.js",
   "files": [
     "index.js",
+    "transport.js",
     "lib/terminal-stream-parser.js",
     "lib/transmit-stream-parser.js"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "npm rebuild --build-from-source"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "lodash": "^3.6.0",
     "re-emitter": "^1.1.1",
-    "serialport": "jacobrosenthal/node-serialport#update",
     "when": "^3.7.2"
   },
   "keywords": [

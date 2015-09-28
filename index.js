@@ -5,174 +5,60 @@ var util = require('util');
 var when = require('when');
 var nodefn = require('when/node');
 var reemit = require('re-emitter');
-var cloneDeep = require('lodash/lang/cloneDeep');
-var Serial = require('serialport');
-var SerialPort = Serial.SerialPort;
 var EventEmitter = require('events').EventEmitter;
+
+var Transport = require('./transport');
 
 var TerminalStreamParser = require('./lib/terminal-stream-parser');
 var TransmitStreamParser = require('./lib/transmit-stream-parser');
 
-var openRegexp = new RegExp('Serialport not open.');
-
-function closeCustomTransport(customTransport){
-  return when.promise(function(resolve, reject){
-    customTransport.close(function(err){
-      if(err && !openRegexp.test(err.message)){
-        // reject if error is not "Serialport not open."
-        return reject(err);
-      }
-
-      resolve();
-    });
-  });
-}
-
-var toLift = ['open', 'close', 'set', 'update', 'write'];
-
-// only lift the functions we use
-function lifter(result, lifted, name){
-  if(toLift.indexOf(name) !== -1){
-    result[name] = lifted;
-  }
-
-  return result;
-}
-
 function Protocol(options){
-  var customTransport = options.transport;
-
   EventEmitter.call(this);
-
-  //todo fail on no options.path
-  var path = options.path;
-  var opts = options.options || { baudrate: 9600 };
-  var TransportCtor = SerialPort;
-  if(customTransport){
-    path = customTransport.path;
-    opts = customTransport.options;
-    TransportCtor = customTransport.constructor;
-  }
 
   this._terminal = new TerminalStreamParser();
   this._transmit = new TransmitStreamParser();
 
-  // if we receive a SerialPort in options, we don't want to mutate it
-  // so we use this pattern to copy and promisify it
-  function Transport(){
-    TransportCtor.apply(this, arguments);
+  var TransportCtor = options.transport || Transport;
 
-    if(customTransport){
-      this.options.dataCallback = function(data){
-        customTransport.options.parser(this, data);
-      }.bind(this);
-    }
-  }
-  util.inherits(Transport, TransportCtor);
-  // passing Transport.prototype to the last argument uses that as the accumulator
-  nodefn.liftAll(TransportCtor.prototype, lifter, Transport.prototype);
-
-  this._isOpen = false;
-  var transport = this._transport = new Transport(path, opts, false);
-  // saving the original options from the transport to allow
-  this._options = cloneDeep({
-    path: transport.path,
-    options: transport.options,
+  this._options = {
     echo: options.echo || false
-  });
+  };
 
-  reemit(transport, this, ['open', 'close']);
+  this._transport = new TransportCtor(_.omit(options, 'transport'));
 
-  // if we are given a transport, attempt to close it
-  if(customTransport){
-    // make this a promise for simpler code paths
-    this._originalTransportClosed = closeCustomTransport(customTransport);
-  } else {
-    this._originalTransportClosed = when.resolve();
-  }
+  reemit(this._transport, this, ['open', 'close', 'data']);
 }
 
 util.inherits(Protocol, EventEmitter);
 
-Protocol.prototype._open = function(cb){
-  var self = this;
-  var transport = this._transport;
+Protocol.prototype.isOpen = function isOpen(){
+  return this._transport.isOpen();
+};
 
+Protocol.prototype.open = function(cb){
   var promise;
-  if(this._isOpen){
-    promise = when.reject(new Error('Transport already open.'));
-  } else {
-    promise = transport.open()
-      .tap(function(){
-        self._isOpen = true;
-      });
+  if(this.isOpen()){
+    promise = when.resolve();
+  }else{
+    promise = this._transport.open();
   }
-
   return nodefn.bindCallback(promise, cb);
 };
 
-Protocol.prototype._close = function(cb){
-  var self = this;
-  var transport = this._transport;
-
-  function onClose(){
-    self._isOpen = false;
+Protocol.prototype.close = function(cb){
+  var promise;
+  if(!this.isOpen()){
+    promise = when.resolve();
+  }else{
+    promise = this._transport.close();
   }
-
-  var promise = transport.close()
-    .tap(onClose)
-    .catch(function(err){
-      if(err && !openRegexp.test(err.message)){
-        // rethrow error if it is not "Serialport not open."
-        throw err;
-      }
-
-      onClose();
-    });
-
-  return nodefn.bindCallback(promise, cb);
-};
-
-Protocol.prototype._setDtr = function(cb){
-  var transport = this._transport;
-
-  var promise = transport.set({ dtr: false });
-
-  return nodefn.bindCallback(promise, cb);
-};
-
-Protocol.prototype._clrDtr = function(cb){
-  var transport = this._transport;
-
-  var promise = transport.set({ dtr: true });
-
-  return nodefn.bindCallback(promise, cb);
-};
-
-Protocol.prototype._setBrk = function(cb){
-  var transport = this._transport;
-
-  var brkBit = new Buffer([0x00]);
-
-  var promise = transport.update({ baudRate: 200 })
-    .then(function(){
-      return transport.write(brkBit);
-    });
-
-  return nodefn.bindCallback(promise, cb);
-};
-
-Protocol.prototype._clrBrk = function(cb){
-  var transport = this._transport;
-  var options = this._options.options;
-
-  var promise = transport.update({ baudRate: options.baudrate });
-
   return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype.enterProgramming = function(options, cb){
   var self = this;
+  var transport = this._transport;
+
   if(typeof options === 'function'){
     cb = options;
     options = {};
@@ -180,24 +66,28 @@ Protocol.prototype.enterProgramming = function(options, cb){
     options = options || {};
   }
 
-  var promise = this._originalTransportClosed
+  var promise = transport.open()
     .then(function(){
-      if(self._isOpen){
-        return self._close();
+      transport.autoRecover = false;
+      return transport.setBreak();
+    })
+    .then(function(){
+      return transport.set({ dtr: false });
+    })
+    .then(function(){
+      return transport.set({ dtr: true }).delay(60);
+    })
+    .then(function(){
+      return transport.clearBreak();
+    })
+    .then(function(){
+      transport.autoRecover = true;
+      if(transport.isPaused()){
+        return transport.unpause();
       }
     })
     .then(function(){
-      return self._open();
-    })
-    .then(function(){
-      return self._setBrk();
-    })
-    .then(function(){
-      return self.reset();
-    })
-    .delay(100) //need to wait for the setbrk byte to get out on the line
-    .then(function(){
-      return self._clrBrk();
+      return transport.flush();
     });
 
   return nodefn.bindCallback(promise, cb);
@@ -205,6 +95,7 @@ Protocol.prototype.enterProgramming = function(options, cb){
 
 Protocol.prototype.exitProgramming = function(options, cb){
   var self = this;
+  var transport = this._transport;
 
   if(typeof options === 'function'){
     cb = options;
@@ -217,11 +108,18 @@ Protocol.prototype.exitProgramming = function(options, cb){
     .then(function(){
       self._terminal.clearIgnore();
       if(!options.keepOpen){
-        return self._close();
+        return transport.close();
       }
       if(options.listen){
         return self.listenPort();
       }
+    })
+    .otherwise(function(err){
+      //close socket
+      return transport.close()
+        .then(function(){
+          throw err;
+        });
     });
 
   return nodefn.bindCallback(promise, cb);
@@ -232,13 +130,13 @@ Protocol.prototype._emitData = function _emitData(chunk){
 };
 
 Protocol.prototype.listenPort = function listenPort(cb){
-  this._transport.on('data', this._emitData.bind(this));
+  this.on('data', this._emitData.bind(this));
 
   return nodefn.bindCallback(when.resolve(), cb);
 };
 
 Protocol.prototype.send = function send(data, cb){
-  var transport = this._transport;
+  var self = this;
 
   var responseLength = data.length + 1;
 
@@ -247,11 +145,11 @@ Protocol.prototype.send = function send(data, cb){
   var buffer = new Buffer(0);
   function onChunk(chunk){
     buffer = Buffer.concat([buffer, chunk]);
+
     if(buffer.length < responseLength){
       // keep buffering
       return;
     }
-
     if (buffer.length > responseLength) {
       // or ignore after
       defer.reject(new Error('buffer overflow ' + buffer.length + ' > ' + responseLength));
@@ -262,65 +160,48 @@ Protocol.prototype.send = function send(data, cb){
     }
   }
 
-  transport.on('data', onChunk);
+  this.on('data', onChunk);
 
-  transport.write(data)
+  this._transport.send(data)
     .catch(defer.reject);
 
   var promise = defer.promise.finally(function(){
-    transport.removeListener('data', onChunk);
+    self.removeListener('data', onChunk);
   });
 
   return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype.write = function(data, cb){
-  var transport = this._transport;
-
   var transmitEvents = this._transmit.parseStreamChunk(data);
   this.emit('transmit', transmitEvents);
 
   if(!this._options.echo){
     this._terminal.ignore(data);
   }
-
-  var promise = transport.write(data);
+  var promise = this._transport.send(data);
 
   return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype.reset = function reset(cb){
-  var self = this;
+  var transport = this._transport;
 
-  var promise = this._setDtr()
+  var promise = transport.set({ dtr: true })
     .delay(2)
     .then(function(){
-      return self._clrDtr();
+      return transport.set({ dtr: false });
     });
 
   return nodefn.bindCallback(promise, cb);
 };
 
 Protocol.prototype.signoff = function signoff(cb){
-  var transport = this._transport;
-
   var signoffBit = new Buffer([0]);
 
-  var promise = transport.write(signoffBit);
+  var promise = this._transport.send(signoffBit);
 
   return nodefn.bindCallback(promise, cb);
-};
-
-Protocol.prototype.open = function open(cb){
-  return this._open(cb);
-};
-
-Protocol.prototype.close = function close(cb){
-  if(this._isOpen){
-    return this._close(cb);
-  }else{
-    return nodefn.bindCallback(when.resolve(), cb);
-  }
 };
 
 Protocol.prototype.setEcho = function setEcho(echo){
@@ -329,11 +210,8 @@ Protocol.prototype.setEcho = function setEcho(echo){
 };
 
 Protocol.listPorts = function(cb){
-  var results = nodefn.call(Serial.list)
-    .then(function(ports){
-      return _.pluck(ports, 'comName');
-    });
-  return nodefn.bindCallback(results, cb);
+  //TODO Refactor listPorts call in bs2-serial to break serial-protocol dependency chain
+  return nodefn.bindCallback(Transport.listPorts(), cb);
 };
 
 module.exports = Protocol;
