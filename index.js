@@ -46,13 +46,7 @@ Protocol.prototype.open = function(cb){
 };
 
 Protocol.prototype.close = function(cb){
-  var promise;
-  if(!this.isOpen()){
-    promise = when.resolve();
-  }else{
-    promise = this._transport.close();
-  }
-  return nodefn.bindCallback(promise, cb);
+  return nodefn.bindCallback(this._transport.close(), cb);
 };
 
 Protocol.prototype.enterProgramming = function(options, cb){
@@ -70,6 +64,14 @@ Protocol.prototype.enterProgramming = function(options, cb){
     .then(function(){
       transport.autoRecover = false;
       return transport.setBreak();
+    })
+    .then(function(){
+      return transport.flush();
+    })
+    .then(function(){
+      if(transport.isPaused()){
+        return transport.unpause();
+      }
     })
     .then(function(){
       return transport.set({ dtr: false });
