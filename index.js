@@ -27,6 +27,8 @@ function Protocol(options){
   this._transport = new TransportCtor(_.omit(options, 'transport'));
 
   reemit(this._transport, this, ['open', 'close', 'data']);
+  this.on('data', this._emitTerminal.bind(this));
+  this._terminalEvents = true;
 }
 
 util.inherits(Protocol, EventEmitter);
@@ -59,6 +61,8 @@ Protocol.prototype.enterProgramming = function(options, cb){
   }else{
     options = options || {};
   }
+
+  this._terminalEvents = false;
 
   var promise = transport.open()
     .then(function(){
@@ -112,9 +116,6 @@ Protocol.prototype.exitProgramming = function(options, cb){
       if(!options.keepOpen){
         return transport.close();
       }
-      if(options.listen){
-        return self.listenPort();
-      }
     })
     .otherwise(function(err){
       //close socket
@@ -122,19 +123,18 @@ Protocol.prototype.exitProgramming = function(options, cb){
         .then(function(){
           throw err;
         });
+    })
+    .ensure(function(){
+      self._terminalEvents = true;
     });
 
   return nodefn.bindCallback(promise, cb);
 };
 
-Protocol.prototype._emitData = function _emitData(chunk){
-  this.emit('terminal', this._terminal.parseStreamChunk(chunk));
-};
-
-Protocol.prototype.listenPort = function listenPort(cb){
-  this.on('data', this._emitData.bind(this));
-
-  return nodefn.bindCallback(when.resolve(), cb);
+Protocol.prototype._emitTerminal = function _emitTerminal(chunk){
+  if(this._terminalEvents){
+    this.emit('terminal', this._terminal.parseStreamChunk(chunk));
+  }
 };
 
 Protocol.prototype.send = function send(data, cb){
