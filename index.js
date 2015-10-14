@@ -125,7 +125,9 @@ Protocol.prototype.exitProgramming = function(options, cb){
         });
     })
     .ensure(function(){
-      self._terminalEvents = true;
+      if(options.listen){
+        self._terminalEvents = true;
+      }
     });
 
   return nodefn.bindCallback(promise, cb);
