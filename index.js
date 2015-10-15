@@ -139,10 +139,17 @@ Protocol.prototype._emitTerminal = function _emitTerminal(chunk){
   }
 };
 
-Protocol.prototype.send = function send(data, cb){
+Protocol.prototype.send = function send(data, options, cb){
   var self = this;
 
-  var responseLength = data.length + 1;
+  if(typeof options === 'function'){
+    cb = options;
+    options = {};
+  }
+
+  var ackLength = _.get(options, 'ackLength', 1);
+
+  var responseLength = data.length + ackLength;
 
   var defer = when.defer();
 
